@@ -4,7 +4,7 @@ from pathlib import Path
 import shutil
 import base64
 from calibrate import CalibrateCamera
-from marker import EstimateExtrinsicUsingMarker
+from marker import *
 from render import Render
 import subprocess
 import time
@@ -16,10 +16,9 @@ def start_xvfb():
         subprocess.Popen(["Xvfb", ":99", "-screen", "0", "1024x768x24"])
         time.sleep(2) # Give Xvfb a moment to start.
         os.environ["DISPLAY"] = ":99" #This affects the streamlit process.
-        st.success("Xvfb started and DISPLAY set (Streamlit only).")
 
     except Exception as e:
-        st.error(f"Error starting Xvfb: {e}")
+        pass
 
 def set_libgl_software():
     """Sets the LIBGL_ALWAYS_SOFTWARE environment variable."""
@@ -29,12 +28,8 @@ def set_libgl_software():
         # This only affects the environment of the subprocess itself.
         # If your goal is to affect the Streamlit process, this will not work.
         subprocess.run(["export", "LIBGL_ALWAYS_SOFTWARE=1"], shell=True, check=True)
-        st.success("LIBGL_ALWAYS_SOFTWARE set (in subprocess).")
-
-    except subprocess.CalledProcessError as e:
-        st.error(f"Error setting LIBGL_ALWAYS_SOFTWARE: {e}")
     except Exception as e:
-        st.error(f"An unexpected error occurred: {e}")
+        pass
 
 def re_encode_video(input_file, output_file):
     """Re-encodes a video using FFmpeg."""
@@ -63,6 +58,12 @@ def wait(seconds):
     import time
     time.sleep(seconds)
 
+calib_video_path = "data/uploads/calibration_video.mp4"
+ar_video_path = "data/uploads/marker_video.mp4"
+output_path = "data/output"
+square_size = 19.00 
+n_images = 40
+
 # Set up directories
 set_libgl_software()
 start_xvfb()
@@ -79,31 +80,35 @@ window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});
 
 # Sidebar options
 st.sidebar.header("Configuration")
+tracking_method = st.sidebar.selectbox("Tracking Method", ["Detection", "Optical Flow", "Kalman"])
 position_method = st.sidebar.selectbox("Positioning Method", ["Marker", "Markerless"])
 depth_method = st.sidebar.selectbox("Depth Estimation", ["Stereo", "SfM"])
 
 # Main UI
-st.title("Computer Vision Project UI")
+st.title("Placing a virtual object in the real world")
 
 # File uploaders
 st.subheader("Upload Files")
 CALIB_VIDEO_PATH = UPLOAD_DIR / "calibration_video.mp4"
 MARKER_VIDEO_PATH = UPLOAD_DIR / "marker_video.mp4"
 OBJ_FILE_PATH = UPLOAD_DIR / "model.obj"
+
+# upload calibration video label
+st.markdown("Upload Calibration Video", unsafe_allow_html=True)
 calib_video = st.file_uploader("Upload Calibration Video", type=["mp4"], key="calib", label_visibility='collapsed')
 if calib_video:
     with open(CALIB_VIDEO_PATH, "wb") as f:
         f.write(calib_video.read())
     st.video(str(CALIB_VIDEO_PATH))
 
-
+st.markdown("Upload Marker Video", unsafe_allow_html=True)
 marker_video = st.file_uploader("Upload Marker Video", type=["mp4"], key="marker", label_visibility='collapsed')
 if marker_video:
     with open(MARKER_VIDEO_PATH, "wb") as f:
         f.write(marker_video.read())
     st.video(str(MARKER_VIDEO_PATH))
 
-
+st.markdown("Upload OBJ File", unsafe_allow_html=True)
 obj_file = st.file_uploader("Upload OBJ File", type=["obj"], key="obj", label_visibility='collapsed')
 if obj_file:
     with open(OBJ_FILE_PATH, "wb") as f:
@@ -120,13 +125,10 @@ submit = st.button("Submit")
 if submit:
     st.subheader("Pipeline Progress")
 
-    square_size = 19.00
-    n_images = 40
-
     # Step 1: Calibration
     with st.spinner("Running Calibration..."):
         try:
-            CalibrateCamera(str(CALIB_VIDEO_PATH), str(OUTPUT_DIR), square_size, n_images)
+            CalibrateCamera(calib_video_path, output_path, square_size, n_images)
             # wait(2)
             st.success("Calibration Complete ✅")
         except Exception as e:
@@ -135,12 +137,12 @@ if submit:
     # Step 2: Estimating Extrinsics
     with st.spinner("Estimating Camera Extrinsics..."):
         try:
-            EstimateExtrinsicUsingMarker(
-                str(MARKER_VIDEO_PATH),
-                str(OUTPUT_DIR / "calib_data.npz"),
-                str(OUTPUT_DIR / "extrinsics.npz"),
-                str(OUTPUT_DIR / "intermidiate")
-            )
+            if (tracking_method == "Detection"):
+                EstimateExtrinsicUsingMarkerDetection(ar_video_path, output_path)
+            elif (tracking_method == "Optical Flow"):
+                EstimateExtrinsicUsingMarkerOpticalFlow(ar_video_path, output_path)
+            elif (tracking_method == "Kalman"):
+                EstimateExtrinsicUsingMarkerKalman(ar_video_path, output_path)
             # wait(2)
             st.success("Extrinsics Estimation Complete ✅")
         except Exception as e:
@@ -149,14 +151,7 @@ if submit:
     # Step 3: Rendering
     with st.spinner("Rendering Output Video..."):
         try:
-            Render(
-                str(MARKER_VIDEO_PATH),
-                None,
-                str(OUTPUT_DIR),
-                str(OUTPUT_DIR / "extrinsics.npz"),
-                str(OUTPUT_DIR / "calib_data.npz"),
-                str(OBJ_FILE_PATH)
-            )
+            Render(ar_video_path, f"{output_path}", "data/uploads/model.obj")
             # wait(2)
             output_video_path = "data/output/output.mp4"
             # final_out_path = "data/output/output_fin.mp4"
