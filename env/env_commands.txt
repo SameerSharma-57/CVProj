@@ -1,0 +1,6 @@
+conda create --name cv_project python=3.10
+conda activate cv_project
+conda install opencv
+pip install PyOpenGL PyOpenGL_accelerate pyrr glfw tqdm matplotlib
+pip install tqdm
+pip install matplotlib
