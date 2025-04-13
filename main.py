@@ -159,7 +159,6 @@ if submit:
             # success, error_message = re_encode_video(output_video_path,final_out_path)
             if os.path.exists(final_out_path):
                 st.success("Rendering Complete ✅")
-                st.video(str(final_out_path))
                 with open(final_out_path, "rb") as f:
                     video_bytes = f.read()
                     b64 = base64.b64encode(video_bytes).decode()
