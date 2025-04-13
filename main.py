@@ -58,8 +58,8 @@ def wait(seconds):
     import time
     time.sleep(seconds)
 
-calib_video_path = "data/uploads/calibration_video.mp4"
-ar_video_path = "data/uploads/marker_video.mp4"
+calib_video_path = "uploads/calibration_video.mp4"
+ar_video_path = "uploads/marker_video.mp4"
 output_path = "data/output"
 square_size = 19.00 
 n_images = 40
@@ -151,9 +151,9 @@ if submit:
     # Step 3: Rendering
     with st.spinner("Rendering Output Video..."):
         try:
-            Render(ar_video_path, f"{output_path}", "data/uploads/model.obj")
+            Render(ar_video_path, f"{output_path}", "uploads/model.obj")
             # wait(2)
-            output_video_path = "data/output/output.mp4"
+            output_video_path = "data/output/videos/3_render.mp4"
             # final_out_path = "data/output/output_fin.mp4"
             final_out_path = output_video_path
             # success, error_message = re_encode_video(output_video_path,final_out_path)
